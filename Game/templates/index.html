@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stone Paper Scissors Game</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            background-color: #2C3E50;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        .button {
+            padding: 10px 20px;
+            margin: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+        }
+        .start-button { background-color: #2ECC71; }
+        #result { font-size: 24px; margin: 20px; }
+        #score { font-size: 18px; color: #F1C40F; }
+        .game-title {
+            font-size: 2.5em;
+            color: #E74C3C;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            margin-bottom: 30px;
+        }
+
+        .game-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: rgba(52, 73, 94, 0.8);
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        }
+
+        .hand-gestures {
+            width: 100%;
+            max-width: 600px;
+            margin: 20px auto;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(255,255,255,0.1);
+        }
+
+        .input-container {
+            margin: 20px 0;
+        }
+
+        #rounds {
+            padding: 12px 20px;
+            font-size: 18px;
+            border-radius: 8px;
+            border: 2px solid #3498DB;
+            background-color: #34495E;
+            color: white;
+            width: 200px;
+            text-align: center;
+        }
+
+        .choice-container {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .game-choice {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            padding: 15px;
+            border-radius: 15px;
+            background-color: rgba(255,255,255,0.1);
+        }
+
+        .game-choice:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="game-title">Stone Paper Scissors Game</h1>
+        
+        <div id="setup">
+            <img src="{{ url_for('static', filename='hand-gestures.png') }}" 
+                 alt="Stone Paper Scissors Gestures" 
+                 class="hand-gestures">
+            
+            <div class="input-container">
+                <input type="number" 
+                       id="rounds" 
+                       placeholder="Enter number of rounds"
+                       min="1" 
+                       max="10">
+                <button class="button start-button" onclick="startGame()">Start Game</button>
+            </div>
+        </div>
+    <div id="game" style="display:none;">
+        <div id="score"></div>
+        <div id="computer-area">
+            <h3>Computer's Choice</h3>
+            <div id="computer-choice" class="computer-choice">
+                <img src="" alt="computer choice" style="width: 100px; height: 100px;">
+            </div>
+        </div>
+        <div id="result"></div>
+        <div class="choice-container">
+            <div class="game-choice choice-animation" onclick="play('Stone')">
+                <img src="{{ url_for('static', filename='stone.png') }}" alt="Stone" width="100">
+            </div>
+            <div class="game-choice choice-animation" onclick="play('Paper')">
+                <img src="{{ url_for('static', filename='paper.png') }}" alt="Paper" width="100">
+            </div>
+            <div class="game-choice choice-animation" onclick="play('Scissors')">
+                <img src="{{ url_for('static', filename='scissors.png') }}" alt="Scissors" width="100">
+            </div>
+        </div>
+    </div>
+    <script>
+        let rounds = 0;
+        let currentRound = 0;
+        let userScore = 0;
+        let compScore = 0;
+
+        function startGame() {
+            rounds = parseInt(document.getElementById('rounds').value);
+            if (rounds > 0) {
+                document.getElementById('setup').style.display = 'none';
+                document.getElementById('game').style.display = 'block';
+                updateScore();
+            }
+        }
+
+        function play(choice) {
+            if (currentRound >= rounds) return;
+            
+            // Animate player choice
+            const choices = document.querySelectorAll('.game-choice');
+            choices.forEach(c => {
+                if (c.querySelector(`img[alt="${choice}"]`)) {
+                    c.classList.add('shake');
+                    setTimeout(() => c.classList.remove('shake'), 500);
+                }
+            });
+
+            fetch('/play', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({choice: choice})
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Show computer's choice with animation
+                const computerChoice = document.getElementById('computer-choice');
+                computerChoice.querySelector('img').src = `{{ url_for('static', filename='') }}${data.computerChoice.toLowerCase()}.png`;
+                computerChoice.classList.remove('show');
+                void computerChoice.offsetWidth; // Trigger reflow
+                computerChoice.classList.add('show');
+
+                document.getElementById('result').innerHTML = data.result;
+                if (data.winner === 'user') userScore++;
+                else if (data.winner === 'computer') compScore++;
+                currentRound++;
+                updateScore();
+                
+                if (currentRound >= rounds) {
+                    setTimeout(showFinalResult, 1000);
+                }
+            });
+        }
+
+        function updateScore() {
+            document.getElementById('score').innerHTML = 
+                `Round: ${currentRound}/${rounds}<br>Computer: ${compScore} | Player: ${userScore}`;
+        }
+
+        function showFinalResult() {
+            let result = '';
+            if (compScore > userScore)
+                result = `Computer won the game with ${compScore} points!`;
+            else if (userScore > compScore)
+                result = `Congratulations! You won the game with ${userScore} points!`;
+            else
+                result = "The Game was a tie!";
+            
+            document.getElementById('game').innerHTML = `
+                <h2>${result}</h2>
+                <button class="button start-button" onclick="location.reload()">Play Again</button>
+            `;
+        }
+    </script>
+</body>
+</html>
